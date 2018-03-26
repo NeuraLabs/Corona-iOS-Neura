@@ -3,7 +3,7 @@
 path=$(dirname "$0")
 
 OUTPUT_DIR=$1
-TARGET_NAME=plugin_library
+TARGET_NAME=neura_plugin_library
 OUTPUT_SUFFIX=a
 CONFIG=Release
 

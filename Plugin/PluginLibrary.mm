@@ -9,6 +9,8 @@
 
 #include <CoronaRuntime.h>
 #import <UIKit/UIKit.h>
+#import <NeuraSDK/NeuraSDK.h>
+#import <CoronaLuaIOS.h>
 
 // ----------------------------------------------------------------------------
 
@@ -42,7 +44,11 @@ class PluginLibrary
 	public:
 		static int init( lua_State *L );
 		static int show( lua_State *L );
-        static int userHospital( lua_State *L );
+        static int authenticate( lua_State *L );
+        static int simulateAnEvent( lua_State *L);
+        static int subscribeToEvent( lua_State *L);
+        static int isLoggedIn( lua_State *L );
+        static int logout( lua_State *L );
 
 	private:
 		CoronaLuaRef fListener;
@@ -81,14 +87,18 @@ PluginLibrary::Open( lua_State *L )
 	// Register __gc callback
 	const char kMetatableName[] = __FILE__; // Globally unique string to prevent collision
 	CoronaLuaInitializeGCMetatable( L, kMetatableName, Finalizer );
-
+    
 	// Functions in library
 	const luaL_Reg kVTable[] =
 	{
 		{ "init", init },
 		{ "show", show },
-        {"userLeftHospital", userHospital},
-
+        { "authenticate", authenticate },
+        { "simulateAnEvent", simulateAnEvent },
+        { "subscribeToEvent", subscribeToEvent },
+        { "isLoggedIn", isLoggedIn },
+        { "logout", logout },
+        
 		{ NULL, NULL }
 	};
 
@@ -97,7 +107,7 @@ PluginLibrary::Open( lua_State *L )
 	CoronaLuaPushUserdata( L, library, kMetatableName );
 
 	luaL_openlib( L, kName, kVTable, 1 ); // leave "library" on top of stack
-
+    
 	return 1;
 }
 
@@ -133,18 +143,22 @@ PluginLibrary::init( lua_State *L )
 
 		CoronaLuaRef listener = CoronaLuaNewRef( L, listenerIndex );
 		library->Initialize( listener );
+        
+        //TODO - Parse app id and app secret from dictionary
+        NSDictionary* dict = CoronaLuaCreateDictionary(L, 1);
+        NSString * message = [NSString stringWithFormat:@"App data = %@", dict];
+        
+        // Create event and add message to it
+        CoronaLuaNewEvent( L, kEvent );
+        lua_pushstring( L, [message UTF8String] );
+        lua_setfield( L, -2, "message" );
+        
+        // Dispatch event to library's listener
+        CoronaLuaDispatchEvent( L, library->GetListener(), 0 );
 	}
 
-	return 0;
-}
 
-int
-PluginLibrary::userHospital( lua_State *L )
-{
-    int listenerIndex = 1;
-  
-    
-    return 1;
+	return 0;
 }
 
 // [Lua] library.show( word )
@@ -174,15 +188,133 @@ PluginLibrary::show( lua_State *L )
 
 	Self *library = ToLibrary( L );
 
-	// Create event and add message to it
-	CoronaLuaNewEvent( L, kEvent );
-	lua_pushstring( L, [message UTF8String] );
-	lua_setfield( L, -2, "message" );
+    // Create event and add message to it
+    CoronaLuaNewEvent( L, kEvent );
+    lua_pushstring( L, [message UTF8String] );
+    lua_setfield( L, -2, "message" );
 
-	// Dispatch event to library's listener
-	CoronaLuaDispatchEvent( L, library->GetListener(), 0 );
-
+    // Dispatch event to library's listener
+    CoronaLuaDispatchEvent( L, library->GetListener(), 0 );
+    
+   // authenticate(L);
+    //logout(L);
+    
 	return 0;
+}
+
+int
+PluginLibrary::authenticate( lua_State *L )
+{
+    Self *library = ToLibrary( L );
+    
+    NeuraAnonymousAuthenticationRequest *request = [NeuraAnonymousAuthenticationRequest new];
+    [NeuraSDK.shared authenticateWithRequest:request callback:^(NeuraAuthenticationResult * _Nonnull result) {
+         NSString *message = @"Login success";
+        if (result.error) {
+            
+            // Handle authentication errors.
+            message = @"Login error = ";
+            message = [message stringByAppendingString:result.error.description];
+        }
+        
+        // Create event and add message to it
+        CoronaLuaNewEvent( L, kEvent );
+        lua_pushstring( L, [message UTF8String] );
+        lua_setfield( L, -2, "message" );
+        
+        // Dispatch event to library's listener
+        CoronaLuaDispatchEvent( L, library->GetListener(), 0 );
+        
+//        simulateAnEvent(L);
+//        subscribeToEvent(L);
+    }];
+
+    
+    return 0;
+}
+
+int
+PluginLibrary::simulateAnEvent( lua_State *L) {
+    char const *eventName = lua_tostring(L, 1);
+    if (eventName == nil) return -1;
+    
+    NEventName enumEventName = [NEvent enumForEventName: [NSString stringWithUTF8String:eventName]];
+    [NeuraSDK.shared simulateEvent:(enumEventName) callback:^(NeuraAPIResult * result){
+        NSString * title = result.success ? @"Approve" : @"Error";
+        NSString *message = @"Simulate an event: ";
+   
+        message = [message stringByAppendingString: title];
+        
+        Self *library = ToLibrary( L );
+        
+        CoronaLuaNewEvent( L, kEvent );
+        lua_pushstring( L, [message UTF8String] );
+        lua_setfield( L, -2, "message" );
+        
+        // Dispatch event to library's listener
+        CoronaLuaDispatchEvent( L, library->GetListener(), 0 );
+    }];
+
+    return 0;
+}
+
+int
+PluginLibrary::subscribeToEvent(lua_State *L) {
+    char const *eventNameChar = lua_tostring(L, 1);
+    char const *eventIdChar = lua_tostring(L, 2);
+    
+    if (eventNameChar == nil || eventIdChar == nil) return -1;
+    
+    NSString * eventName = [NSString stringWithUTF8String: eventNameChar];
+    NSString * eventId = [NSString stringWithUTF8String: eventIdChar];
+    
+    NSString *webhookId = nil;
+    NSubscription *sub = [[NSubscription alloc] initWithEventName:eventName identifier:eventId webhookId:webhookId method:NSubscriptionMethodPush];
+    
+    [NeuraSDK.shared addSubscription:sub callback:^(NeuraAddSubscriptionResult * response){
+        NSString *message =  [NSString stringWithFormat:@"%@%@", @"Failed subscription to", eventName];
+        if (!response.error) { message = [NSString stringWithFormat:@"%@%@", @"Subscribed to:", eventName]; }
+        
+        Self *library = ToLibrary( L );
+        
+        CoronaLuaNewEvent( L, kEvent );
+        lua_pushstring( L, [message UTF8String] );
+        lua_setfield( L, -2, "message" );
+        
+        // Dispatch event to library's listener
+        CoronaLuaDispatchEvent( L, library->GetListener(), 0 );
+        
+    }];
+    
+    return 0;
+}
+
+int
+PluginLibrary::isLoggedIn(lua_State *L) {
+    lua_pushboolean(L, NeuraSDK.shared.isAuthenticated);
+    return 1;
+}
+
+int
+PluginLibrary::logout(lua_State *L) {
+    if (!NeuraSDK.shared.isAuthenticated) return -1;
+    
+    [NeuraSDK.shared logoutWithCallback:^(NeuraLogoutResult * _Nonnull result) {
+        NSString *message =  @"Logout status = ";
+        NSString * title = result.success ? @"Approve" : @"Error";
+        if (result.error != nil) { message = [message stringByAppendingString: title]; }
+        
+        Self *library = ToLibrary( L );
+        
+        CoronaLuaNewEvent( L, kEvent );
+        lua_pushstring( L, [message UTF8String] );
+        lua_setfield( L, -2, "message" );
+        
+        // Dispatch event to library's listener
+        CoronaLuaDispatchEvent( L, library->GetListener(), 0 );
+    }];
+    
+    return 0;
 }
 
 // ----------------------------------------------------------------------------

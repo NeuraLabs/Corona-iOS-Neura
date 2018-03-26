@@ -22,16 +22,7 @@
 
 - (void)didLoadMain:(id<CoronaRuntime>)runtime
 {
-    // DISPATCH CUSTOM EVENT
-    // Create 'delegate' event
-//    const char kNameKey[] = "name";
-//    const char kValueKey[] = "delegate";
-//    lua_newtable( L );
-//    lua_pushstring( L, kValueKey );     // All events are Lua tables
-//    lua_setfield( L, -2, kNameKey );    // that have a 'name' property
-//
-//    Corona::Lua::RuntimeDispatchEvent( L, -1 );
-   
+    
 }
 
 
@@ -46,80 +37,8 @@
     
     [self requestPermissionForPushNotifications];
     
-    NeuraAnonymousAuthenticationRequest *request = [NeuraAnonymousAuthenticationRequest new];
-    [NeuraSDK.shared authenticateWithRequest:request callback:^(NeuraAuthenticationResult * _Nonnull result) {
-        if (result.error) {
-            // Handle authentication errors.
-            NSLog(@"login error = %@", result.error);
-        }
-        NSLog(@"login success ");
-        
-        // Init a new subscription.
-        NSString *identifier = [NSString stringWithFormat:@"%@_%@", NeuraSDK.shared.neuraUserId, @"userLeftHospital"];
-        NSubscription *newSubscription = [[NSubscription alloc] initWithEvenName:@"userLeftHospital" forPushWithIdentifier:identifier];
-        
-        // Add the new subscription.
-        [NeuraSDK.shared addSubscription:newSubscription callback:^(NeuraAddSubscriptionResult * _Nonnull result) {
-            
-            if (result.error != nil) {
-                UIAlertController *alertController = [UIAlertController alertControllerWithTitle:@"Error"
-                                                                                         message:[result.error localizedDescription]
-                                                                                  preferredStyle:UIAlertControllerStyleAlert];
-                
-                UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil];
-                [alertController addAction:okAction];
-            }
-            
-    
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                NEventName enumEventName = [NEvent enumForEventName:@"userLeftHospital"];
-                [NeuraSDK.shared simulateEvent:(enumEventName) callback:^(NeuraAPIResult * result){
-                    NSString * title = result.success ? @"Approve" : @"Error";
-                    NSString * message = result.errorString ? result.errorString : @"Sucsess";
-                    UIAlertController *alertVC = [UIAlertController alertControllerWithTitle:title message:message preferredStyle:UIAlertControllerStyleAlert];
-                    [alertVC addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-                    
-                    UIViewController *topController = [UIApplication sharedApplication].keyWindow.rootViewController;
-                    
-                    while (topController.presentedViewController) {
-                        topController = topController.presentedViewController;
-                    }
-                    
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        [topController presentViewController:alertVC animated:true completion:^(void){}];
-                    });
-                    
-                    
-                }];
-                
-                
-                [NeuraSDK.shared getAppPermissionsListWithCallback:^(NeuraPermissionsListResult *result) {
-                    if (result.success) {
-                        [NeuraSDK.shared getAppPermissionsListWithCallback:^(NeuraPermissionsListResult * _Nonnull result) {
-                            // NSLog(@"permission result success = %@", result.eventsByName);
-                        }];
-                        
-                    }
-                }];
-            });
-            
-            NSLog(@"subscribeToEvent = success:%@ error:%@", @(result.success), result.error);
-            
-        }];
-    }];
-    
 
     return YES;
-}
-
-- (void) sendCusomtEvent {
-//        const char kNameKey[] = "name";
-//        const char kValueKey[] = "delegate";
-//        lua_newtable( L );
-//        lua_pushstring( L, kValueKey );     // All events are Lua tables
-//        lua_setfield( L, -2, kNameKey );    // that have a 'name' property
-//
-//        Corona::Lua::RuntimeDispatchEvent( L, -1 );
 }
 
 - (void)requestPermissionForPushNotifications {
@@ -175,19 +94,6 @@
     
     // Don't forget to call the completion handler!
     completionHandler(UIBackgroundFetchResultNoData);
-}
-
-- (void) getEvents {
-    [NeuraSDK.shared getEventsListWithCallback:^(NeuraEventsListResult * _Nonnull result){
-        NSArray<NEvent *> *eventDefinitions = result.eventDefinitions;
-        NSMutableArray * eventNames = [NSMutableArray new];
-        
-        if (result.eventDefinitions.count > 0) {
-            for (NEvent * item in eventDefinitions) {
-                [eventNames addObject:item.name];
-            }
-        }
-    }];
 }
 
 // The following are stubs for common delegate methods. Uncomment and implement
