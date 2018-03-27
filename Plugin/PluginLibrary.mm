@@ -319,7 +319,7 @@ PluginLibrary::logout(lua_State *L) {
 
 // ----------------------------------------------------------------------------
 
-CORONA_EXPORT int luaopen_plugin_library( lua_State *L )
+CORONA_EXPORT int luaopen_plugin_neura( lua_State *L )
 {
 	return PluginLibrary::Open( L );
 }
