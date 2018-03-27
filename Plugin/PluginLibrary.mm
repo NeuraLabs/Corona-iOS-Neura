@@ -56,8 +56,8 @@ class PluginLibrary
 
 // ----------------------------------------------------------------------------
 
-// This corresponds to the name of the library, e.g. [Lua] require "plugin.library"
-const char PluginLibrary::kName[] = "plugin.library";
+// This corresponds to the name of the library, e.g. [Lua] require "plugin.neura"
+const char PluginLibrary::kName[] = "plugin.neura";
 
 // This corresponds to the event name, e.g. [Lua] event.name
 const char PluginLibrary::kEvent[] = "pluginlibraryevent";
