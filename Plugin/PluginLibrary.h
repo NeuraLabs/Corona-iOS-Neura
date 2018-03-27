@@ -11,8 +11,8 @@
 #include <CoronaLua.h>
 #include <CoronaMacros.h>
 
-// This corresponds to the name of the library, e.g. [Lua] require "plugin.library"
+// This corresponds to the name of the library, e.g. [Lua] require "plugin.neura"
 // where the '.' is replaced with '_'
-CORONA_EXPORT int luaopen_plugin_library( lua_State *L );
+CORONA_EXPORT int luaopen_plugin_neura( lua_State *L );
 
 #endif // _PluginLibrary_H__
